@@ -4,8 +4,6 @@ const fs    = require('fs');
 const path  = require('path');
 
 
-// Yahan sari API keys aur basic settings hain, aur kya poora code yahi chahiye .
-
 const CONFIG = {
   ADZUNA_APP_ID:   process.env.ADZUNA_APP_ID   || '',
   ADZUNA_APP_KEY:  process.env.ADZUNA_APP_KEY  || '',
@@ -18,9 +16,6 @@ const CONFIG = {
   AI_ENRICH:     true, 
 };
 
-
-// ── User Profile ──────────────────────────────────────────────────────────────
-// Apni details yahan bharo — isi ke hisaab se jobs recommend hongi aur enrich hongi, daal bhai apni details , late ho raha hai.
 
 const USER_PROFILE = {
   degree:             'B.Tech',
@@ -36,9 +31,6 @@ const USER_PROFILE = {
 };
 
 
-// ── Utility Functions ─────────────────────────────────────────────────────────
-
-// Simple sleep
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -51,10 +43,6 @@ const log = {
   section: (m) => console.log(`\n${'─'.repeat(55)}\n  ${m}\n${'─'.repeat(55)}`),
 };
 
-
-// ── API 1: Adzuna ─────────────────────────────────────────────────────────────
-// India ki full-time, part-time aur internship jobs fetch karta hai.
-// Multiple categories mein search karunga ek saath.
 
 async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
   if (!CONFIG.ADZUNA_APP_ID || !CONFIG.ADZUNA_APP_KEY) {
@@ -80,13 +68,13 @@ async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
           results_per_page: 20,
           what:             keyword,
           category:         cat,
-          'content-type':   'application/json',  // hyphen chahiye, underscore nahi
-          sort_by:          'date',              // naye jobs pehle
+          'content-type':   'application/json', 
+          sort_by:          'date',             
         },
         timeout: 15000,
       });
 
-      // API response ko apne format mein convert karo
+     
       const jobs = (res.data.results || []).map(j => ({
         id:           `adzuna_${j.id}`,
         jobTitle:     j.title || 'Not available',
@@ -120,9 +108,6 @@ async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
 }
 
 
-// ── API 2: JSearch (via RapidAPI) ────────────────────────────────────────────
-// LinkedIn, Indeed aur Glassdoor ka data ek saath milega yahan.
-
 async function fetchJSearchJobs(queries) {
   if (!CONFIG.JSEARCH_API_KEY) {
     log.warn('JSearch key missing — skipping. Get free: https://rapidapi.com → search "JSearch"');
@@ -131,7 +116,6 @@ async function fetchJSearchJobs(queries) {
 
   const allJobs = [];
 
-  //user ke quer me faltu baketi daal du😂
   const searchQueries = [
     ...queries.map(q => `${q} jobs in India`),
     'internship India 2025',
@@ -188,8 +172,6 @@ async function fetchJSearchJobs(queries) {
 
     } catch (err) {
       if (err.response?.status === 429) {
-        // Rate limit aaya — thoda aaram kr lo guru jaldi kyu hai
-
         log.warn('JSearch rate limit hit — waiting 5s...');
         await sleep(5000);
       } else {
@@ -202,8 +184,6 @@ async function fetchJSearchJobs(queries) {
 }
 
 
-// ── API 3: Remotive ───────────────────────────────────────────────────────────
-// Purely remote/WFH jobs ke liye
 
 async function fetchRemotiveJobs() {
   const categories = [
@@ -225,7 +205,7 @@ async function fetchRemotiveJobs() {
       });
 
       const now    = Date.now();
-      const cutoff = 30 * 24 * 60 * 60 * 1000; // 30 din ka cutoff
+      const cutoff = 30 * 24 * 60 * 60 * 1000; 
 
       const jobs = (res.data.jobs || [])
         .filter(j => {
@@ -265,14 +245,11 @@ async function fetchRemotiveJobs() {
 }
 
 
-// ── API 4: Arbeitnow ─────────────────────────
-// Remote jobs aur internships globally 
-
 async function fetchArbeitnowJobs() {
   const allJobs = [];
 
   try {
-    // 3 pages fetch karenge zyada results ke liye
+  
     for (let page = 1; page <= 3; page++) {
       const res = await axios.get('https://www.arbeitnow.com/api/job-board-api', {
         params: { page },
@@ -280,7 +257,7 @@ async function fetchArbeitnowJobs() {
       });
 
       const jobs = (res.data.data || [])
-        .filter(j => j.remote || j.tags?.includes('intern'))  // sirf remote ya intern jobs
+        .filter(j => j.remote || j.tags?.includes('intern')) 
         .map(j => ({
           id:          `arbeitnow_${j.slug}`,
           jobTitle:    j.title || 'Not available',
@@ -311,10 +288,6 @@ async function fetchArbeitnowJobs() {
 }
 
 
-// ── API 5: Internshala ────────────────────────────────────────────────────────
-// Internshala ke structured data (JSON-LD) se internships extract karta hai.
-// Iske liye koi API key nahi chahiye — public page se data nikalta hai.
-
 async function fetchInternshalaPublic() {
   const allJobs = [];
   const keywords = ['computer science', 'web development', 'data science', 'python', 'machine learning'];
@@ -332,7 +305,6 @@ async function fetchInternshalaPublic() {
         }
       );
 
-      // Page ke andar JSON-LD structured data dhundho
       const matches = res.data.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g) || [];
 
       for (const block of matches) {
@@ -369,7 +341,6 @@ async function fetchInternshalaPublic() {
             }
           }
         } catch (_) {
-          // Agar koi ek block parse nahi hua, skip karo — baaki ka continue karo
         }
       }
 
@@ -385,9 +356,6 @@ async function fetchInternshalaPublic() {
 }
 
 
-// ── Deduplication ─────────────────────────────────────────────────────────────
-// Same job title + company wali duplicate entries hata deta hai.
-
 function deduplicate(jobs) {
   const seen = new Set();
   return jobs.filter(j => {
@@ -398,9 +366,6 @@ function deduplicate(jobs) {
   });
 }
 
-
-// ── Scam Filter ───────────────────────────────────────────────────────────────
-// Fraud ya spam jobs ko filter karta hai in keywords ki madad se.
 
 const SCAM_WORDS = [
   'pay to apply', 'registration fee', 'deposit required',
@@ -414,15 +379,10 @@ function isScam(job) {
 }
 
 
-// ── Claude AI Enrichment ──────────
-// Jobs ko Claude se analyze karwata hai — ranking, skills, eligibility etc. add karta hai.
-// Agar Claude key nahi hai ya AI_ENRICH = false hai, toh fallback classifiers use hote hain.
-
 async function enrichWithClaude(jobs, batchSize = 8) {
   if (!CONFIG.ANTHROPIC_KEY || !CONFIG.AI_ENRICH) {
     log.warn('Claude enrichment skipped — assigning default scores');
 
-    // Claude nahi hai toh local functions se hi kaam chalao
     return jobs.map((j, i) => ({
       ...j,
       jobType:            detectJobType(j),
@@ -440,7 +400,7 @@ async function enrichWithClaude(jobs, batchSize = 8) {
 
   const enriched = [];
 
-  // Sab jobs ko chhote-chhote batches mein divide karo
+  
   const batches = [];
   for (let i = 0; i < jobs.length; i += batchSize) {
     batches.push(jobs.slice(i, i + batchSize));
@@ -452,7 +412,6 @@ async function enrichWithClaude(jobs, batchSize = 8) {
     const batch = batches[b];
     log.info(`  Batch ${b + 1}/${batches.length} (${batch.length} jobs)...`);
 
-    // Claude ko system context do — user profile ke saath
     const systemPrompt = `You are Badho AI. Enrich raw job data for Indian job seekers.
 
 User Profile:
@@ -510,18 +469,17 @@ Respond ONLY with valid JSON array. No markdown, no explanation.`;
         }
       );
 
-      // Claude ka response parse karo
+
       const text    = res.data.content?.[0]?.text || '[]';
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const parsed  = JSON.parse(cleaned);
 
-      // id ke basis pe ek map bana lo — easy lookup ke liye
       const enrichMap = {};
       for (const e of (Array.isArray(parsed) ? parsed : [])) {
         enrichMap[e.id] = e;
       }
 
-      // Original job data + Claude ka enriched data merge karo
+    
       for (const job of batch) {
         const e = enrichMap[job.id] || {};
         enriched.push({
@@ -545,7 +503,7 @@ Respond ONLY with valid JSON array. No markdown, no explanation.`;
       log.success(`  Batch ${b + 1} enriched ✓`);
 
     } catch (err) {
-      // Claude fail kiya — fallback se kaam chalao, skip mat karo
+    
       log.warn(`  Batch ${b + 1} Claude error: ${err.message} — using fallback`);
 
       for (const job of batch) {
@@ -575,9 +533,6 @@ Respond ONLY with valid JSON array. No markdown, no explanation.`;
 }
 
 
-// ── Fallback Classifiers ──────────────────────────────────────────────────────
-// Yeh tab kaam aate hain jab Claude available nahi hota.
-// Job title aur description se hi type, mode aur skills detect karte hain.
 
 function detectJobType(job) {
   const text = `${job.jobTitle} ${job.description} ${job.contractType} ${job.employmentType} ${(job.tags || []).join(' ')}`.toLowerCase();
@@ -619,11 +574,7 @@ function detectEligibility(job) {
 }
 
 
-// ── Daily Digest Builder ──────────────────────────────────────────────────────
-// Enriched jobs ko categories mein baant ke ek final digest object banata hai.
-
 function buildDigest(jobs) {
-  // Ranking score ke hisaab se sort karo — best jobs pehle
   const sorted = [...jobs].sort((a, b) => (b.rankingScore || 0) - (a.rankingScore || 0));
 
   const internships  = sorted.filter(j => j.jobType === 'Internship').slice(0, 20);
@@ -636,7 +587,7 @@ function buildDigest(jobs) {
   const partTimeJobs = sorted.filter(j => j.jobType === 'Part-Time').slice(0, 20);
   const fullTimeJobs = sorted.filter(j => j.jobType === 'Full-Time').slice(0, 20);
 
-  // Har job se skills count karo — trending skills nikalne ke liye
+
   const skillCount = {};
   for (const job of sorted) {
     for (const s of (job.skillsRequired || [])) {
@@ -648,7 +599,6 @@ function buildDigest(jobs) {
     .slice(0, 15)
     .map(([skill, count]) => ({ skill, jobCount: count }));
 
-  // Top hiring companies — jinke paas zyada openings hain
   const companyCount = {};
   for (const job of sorted) {
     if (job.company && job.company !== 'Not publicly available') {
@@ -659,8 +609,6 @@ function buildDigest(jobs) {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10)
     .map(([company, openings]) => ({ company, openings }));
-
-  // Kitne jobs kahan se aaye — source breakdown
   const sourceCount = {};
   for (const job of sorted) {
     sourceCount[job.source] = (sourceCount[job.source] || 0) + 1;
@@ -703,12 +651,7 @@ function buildDigest(jobs) {
 }
 
 
-// ── Output Save ───────────────────────────────────────────────────────────────
-// Digest ko JSON files mein save karta hai — ek timestamp wala, ek latest.json.
-// Alag-alag category files bhi banta hai jaise internships.json, remote.json etc.
-
 function saveOutput(digest) {
-  // Output folder nahi hai toh bana do
   if (!fs.existsSync(CONFIG.OUTPUT_DIR)) {
     fs.mkdirSync(CONFIG.OUTPUT_DIR, { recursive: true });
   }
@@ -723,7 +666,6 @@ function saveOutput(digest) {
   log.success(`Saved: ${fullPath}`);
   log.success(`Latest: ${latestPath}`);
 
-  // Category-wise alag files bhi save karo
   const cats = {
     internships: digest.sections.top20Internships,
     fresher:     digest.sections.top20FresherJobs,
@@ -743,13 +685,6 @@ function saveOutput(digest) {
 }
 
 
-// ── Main Function ─────────────────────────────────────────────────────────────
-// Yeh poora process run karta hai step by step:
-// 1) APIs se jobs fetch karo
-// 2) Clean + deduplicate karo
-// 3) Claude se enrich karo
-// 4) Digest banao
-// 5) Files mein save karo
 
 async function runBadhoAI() {
   console.log('\n╔══════════════════════════════════════════════════════╗');
@@ -760,56 +695,50 @@ async function runBadhoAI() {
 
   const allRaw = [];
 
-  // ── Step 1: Sab APIs se jobs fetch karo ──────────────────────────────────
   log.section('STEP 1 — Fetching Real Jobs from APIs');
 
-  // Adzuna — India jobs
+  
   log.info('Calling Adzuna API (India jobs)...');
   for (const skill of USER_PROFILE.skills.slice(0, 3)) {
     const jobs = await fetchAdzunaJobs(skill);
     allRaw.push(...jobs);
   }
 
-  // JSearch — LinkedIn + Indeed data
   log.info('Calling JSearch API (LinkedIn + Indeed data)...');
   const jsearchJobs = await fetchJSearchJobs(USER_PROFILE.preferredRoles.slice(0, 3));
   allRaw.push(...jsearchJobs);
 
-  // Remotive — free remote jobs
   log.info('Calling Remotive API (free remote jobs)...');
   const remotiveJobs = await fetchRemotiveJobs();
   allRaw.push(...remotiveJobs);
 
-  // Arbeitnow — free remote + internship jobs
+  
   log.info('Calling Arbeitnow API (free remote + internships)...');
   const arbeitnowJobs = await fetchArbeitnowJobs();
   allRaw.push(...arbeitnowJobs);
 
-  // Internshala — India internships
   log.info('Fetching Internshala structured data...');
   const internshalaJobs = await fetchInternshalaPublic();
   allRaw.push(...internshalaJobs);
 
-  // ── Step 2: Duplicate aur scam jobs hato ─────────────────────────────────
+
   log.section('STEP 2 — Cleaning & Deduplicating');
   log.info(`Total raw jobs fetched: ${allRaw.length}`);
 
   const cleaned = deduplicate(allRaw.filter(j => !isScam(j) && !j.isExpired));
   log.success(`After dedup + scam filter: ${cleaned.length} jobs`);
 
-  // ── Step 3: Claude se AI enrichment ──────────────────────────────────────
   log.section('STEP 3 — Claude AI Enrichment & Ranking');
   const enriched = await enrichWithClaude(cleaned);
 
-  // ── Step 4: Digest banao ──────────────────────────────────────────────────
+
   log.section('STEP 4 — Building Daily Digest');
   const digest = buildDigest(enriched);
 
-  // ── Step 5: Files mein save karo ─────────────────────────────────────────
   log.section('STEP 5 — Saving Output Files');
   const savedPath = saveOutput(digest);
 
-  // ── Final Summary ─────────────────────────────────────────────────────────
+
   console.log('\n╔══════════════════════════════════════════════════════╗');
   console.log('║                  ✅ RUN COMPLETE                    ║');
   console.log('╠══════════════════════════════════════════════════════╣');
@@ -827,27 +756,21 @@ async function runBadhoAI() {
   return digest;
 }
 
-
-// ── Express Server (Optional) ─────────────────────────────────────────────────
-// Agar --server flag de ke run karo toh yeh HTTP API bhi shuru ho jaata hai.
-// Frontend ya koi bhi app /jobs endpoints se data fetch kar sakta hai.
-
 async function startServer() {
   const express = require('express');
   const app     = express();
   app.use(express.json());
 
-  // CORS — sab origins se requests allow karo
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     next();
   });
 
-  let cache   = null;   // last fetch ka data
-  let lastRun = null;   // last fetch ka time
-  let running = false;  // abhi fetch chal rahi hai ya nahi
+  let cache   = null;   
+  let lastRun = null;   
+  let running = false;  
 
-  // Startup pe agar pehle ka data hai toh load kar lo
+
   const loadLatest = () => {
     try {
       const p = path.join(CONFIG.OUTPUT_DIR, 'latest.json');
@@ -859,7 +782,7 @@ async function startServer() {
   };
   loadLatest();
 
-  // Root route — server info aur available routes dikhata hai
+
   app.get('/', (_, res) => res.json({
     service: 'Badho AI – Real Jobs API',
     version: '2.0.0',
@@ -878,7 +801,7 @@ async function startServer() {
     totalJobs: cache?.summary?.totalAfterFilter || 0,
   }));
 
-  // Ek helper function — different categories ke liye ek jaisa route handler
+  
   const getJobs = (key) => (_, res) => {
     if (!cache) return res.status(404).json({ error: 'No data yet. POST /jobs/refresh first.' });
     const data = key === 'all' ? cache.allJobs : cache.sections?.[key] || [];
@@ -899,7 +822,7 @@ async function startServer() {
     res.json(cache.insights?.trendingSkills || []);
   });
 
-  // Refresh route — background mein naya fetch shuru karo
+  
   app.post('/jobs/refresh', (_, res) => {
     if (running) return res.json({ message: 'Already running...', lastRun });
     running = true;
@@ -920,10 +843,6 @@ async function startServer() {
   });
 }
 
-
-// ── Entry Point ───────────────────────────────────────────────────────────────
-// node agenticAI.js          → seedha jobs fetch karo
-// node agenticAI.js --server → HTTP server start karo
 
 if (process.argv.includes('--server')) {
   startServer();

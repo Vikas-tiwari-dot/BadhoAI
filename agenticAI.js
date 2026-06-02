@@ -4,9 +4,8 @@ const fs    = require('fs');
 const path  = require('path');
 
 
-// ── App Settings ──────────────────────────────────────────────────────────────
+// ── App Settings ────────────────────
 // Yahan sari API keys aur basic settings hain.
-// Keys .env file se aati hain — wahan set karo.
 
 const CONFIG = {
   ADZUNA_APP_ID:   process.env.ADZUNA_APP_ID   || '',
@@ -15,14 +14,14 @@ const CONFIG = {
   ANTHROPIC_KEY:   process.env.ANTHROPIC_API_KEY || '',
 
   OUTPUT_DIR:    './Badho_output',
-  MAX_RESULTS:   50,       // ek API call mein zyada se zyada 50 jobs
-  REQUEST_DELAY: 1200,     // APIs ke beech delay (ms) — rate limit se bachne ke liye
-  AI_ENRICH:     true,     // false karo agar Claude se enrichment nahi chahiye
+  MAX_RESULTS:   50,      
+  REQUEST_DELAY: 1200, 
+  AI_ENRICH:     true, 
 };
 
 
 // ── User Profile ──────────────────────────────────────────────────────────────
-// Apni details yahan bharo — isi ke hisaab se jobs recommend hongi
+// Apni details yahan bharo — isi ke hisaab se jobs recommend hongi aur enrich hongi.
 
 const USER_PROFILE = {
   degree:             'B.Tech',
@@ -45,17 +44,17 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Console logs ko thoda acha dikhane ke liye
 const log = {
-  info:    (m) => console.log(`  ℹ️  ${m}`),
-  success: (m) => console.log(`  ✅ ${m}`),
-  warn:    (m) => console.log(`  ⚠️  ${m}`),
-  error:   (m) => console.log(`  ❌ ${m}`),
+  info:    (m) => console.log(`    ${m}`),
+  success: (m) => console.log(`  ${m}`),
+  warn:    (m) => console.log(`   ${m}`),
+  error:   (m) => console.log(`   ${m}`),
   section: (m) => console.log(`\n${'─'.repeat(55)}\n  ${m}\n${'─'.repeat(55)}`),
 };
 
 
 // ── API 1: Adzuna ─────────────────────────────────────────────────────────────
 // India ki full-time, part-time aur internship jobs fetch karta hai.
-// Multiple categories mein search karta hai ek saath.
+// Multiple categories mein search karega ek saath.
 
 async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
   if (!CONFIG.ADZUNA_APP_ID || !CONFIG.ADZUNA_APP_KEY) {
@@ -63,7 +62,7 @@ async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
     return [];
   }
 
-  // In sab categories mein search karenge
+  // In sab categories mein search karenge aur zyada variety ke liye — IT, engineering, science, freshers, part-time
   const categories = [
     'it-jobs', 'engineering-jobs', 'science-jobs',
     'graduate-jobs', 'part-time-jobs'
@@ -122,7 +121,7 @@ async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
 
 
 // ── API 2: JSearch (via RapidAPI) ────────────────────────────────────────────
-// LinkedIn, Indeed aur Glassdoor ka data ek saath milta hai yahan se.
+// LinkedIn, Indeed aur Glassdoor ka data ek saath milega yahan.
 
 async function fetchJSearchJobs(queries) {
   if (!CONFIG.JSEARCH_API_KEY) {
@@ -132,7 +131,7 @@ async function fetchJSearchJobs(queries) {
 
   const allJobs = [];
 
-  // User ki queries ke saath kuch extra common searches bhi add karte hain
+  //user ke quer me faltu baketi daal du😂
   const searchQueries = [
     ...queries.map(q => `${q} jobs in India`),
     'internship India 2025',
@@ -189,7 +188,8 @@ async function fetchJSearchJobs(queries) {
 
     } catch (err) {
       if (err.response?.status === 429) {
-        // Rate limit aaya — thoda rukke phir continue karenge
+        // Rate limit aaya — thoda aaram kr lo guru jaldi kyu hai
+
         log.warn('JSearch rate limit hit — waiting 5s...');
         await sleep(5000);
       } else {
@@ -203,7 +203,7 @@ async function fetchJSearchJobs(queries) {
 
 
 // ── API 3: Remotive ───────────────────────────────────────────────────────────
-// Purely remote/WFH jobs ke liye — free API hai, no key needed.
+// Purely remote/WFH jobs ke liye
 
 async function fetchRemotiveJobs() {
   const categories = [
@@ -265,8 +265,8 @@ async function fetchRemotiveJobs() {
 }
 
 
-// ── API 4: Arbeitnow ──────────────────────────────────────────────────────────
-// Remote jobs aur internships globally — yeh bhi free API hai.
+// ── API 4: Arbeitnow ─────────────────────────
+// Remote jobs aur internships globally 
 
 async function fetchArbeitnowJobs() {
   const allJobs = [];
@@ -414,7 +414,7 @@ function isScam(job) {
 }
 
 
-// ── Claude AI Enrichment ──────────────────────────────────────────────────────
+// ── Claude AI Enrichment ──────────
 // Jobs ko Claude se analyze karwata hai — ranking, skills, eligibility etc. add karta hai.
 // Agar Claude key nahi hai ya AI_ENRICH = false hai, toh fallback classifiers use hote hain.
 

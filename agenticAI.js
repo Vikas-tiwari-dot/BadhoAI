@@ -4,8 +4,7 @@ const fs    = require('fs');
 const path  = require('path');
 
 
-// ── App Settings ────────────────────
-// Yahan sari API keys aur basic settings hain.
+// Yahan sari API keys aur basic settings hain, aur kya poora code yahi chahiye .
 
 const CONFIG = {
   ADZUNA_APP_ID:   process.env.ADZUNA_APP_ID   || '',
@@ -21,7 +20,7 @@ const CONFIG = {
 
 
 // ── User Profile ──────────────────────────────────────────────────────────────
-// Apni details yahan bharo — isi ke hisaab se jobs recommend hongi aur enrich hongi.
+// Apni details yahan bharo — isi ke hisaab se jobs recommend hongi aur enrich hongi, daal bhai apni details , late ho raha hai.
 
 const USER_PROFILE = {
   degree:             'B.Tech',
@@ -39,7 +38,8 @@ const USER_PROFILE = {
 
 // ── Utility Functions ─────────────────────────────────────────────────────────
 
-// Simple sleep — async loops mein delay ke liye kaam aata hai
+// Simple sleep
+
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Console logs ko thoda acha dikhane ke liye
@@ -54,7 +54,7 @@ const log = {
 
 // ── API 1: Adzuna ─────────────────────────────────────────────────────────────
 // India ki full-time, part-time aur internship jobs fetch karta hai.
-// Multiple categories mein search karega ek saath.
+// Multiple categories mein search karunga ek saath.
 
 async function fetchAdzunaJobs(keyword, category = 'it-jobs') {
   if (!CONFIG.ADZUNA_APP_ID || !CONFIG.ADZUNA_APP_KEY) {
